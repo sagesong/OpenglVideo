@@ -10,6 +10,7 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 #import <AVFoundation/AVFoundation.h>
 #import "SJPlayerView.h"
+#import <CoreVideo/CoreVideo.h>
 
 typedef NS_ENUM(NSInteger, VideoEffectType){
     VideoEffectNone = 0,
@@ -24,7 +25,8 @@ typedef NS_ENUM(NSInteger, VideoEffectType){
     AVPlayer *_player;
     AVPlayerItem *_playerItem;
     dispatch_queue_t _myVideoOutputQueue;
-
+    id _notificationToken;
+    id _timeObserver;
 }
 @property (weak, nonatomic) IBOutlet SJPlayerView *playerView;
 
@@ -69,6 +71,7 @@ typedef NS_ENUM(NSInteger, VideoEffectType){
 
 - (IBAction)playBtnClicked:(UIButton *)sender {
     sender.selected = !sender.selected;
+    sender.hidden = !sender.hidden;
     if (sender.selected) {
         [_player play];
         [self.displayLink setPaused:NO];
@@ -81,6 +84,8 @@ typedef NS_ENUM(NSInteger, VideoEffectType){
     
 }
 - (IBAction)libraryBtnClick:(id)sender {
+    [_player pause];
+    [self.displayLink setPaused:YES];
     UIImagePickerController *videoPicker = [[UIImagePickerController alloc] init];
     videoPicker.delegate = self;
     videoPicker.modalPresentationStyle = UIModalPresentationCurrentContext;
@@ -103,6 +108,9 @@ typedef NS_ENUM(NSInteger, VideoEffectType){
 
 - (void)prepareVideoWithUrl:(NSURL *)videoUrl
 {
+    if (_player) {
+    
+    }
     _playerItem = [AVPlayerItem playerItemWithURL:videoUrl];
     _player = [AVPlayer playerWithPlayerItem:_playerItem];
     AVAsset *asset = [_playerItem asset];
@@ -116,9 +124,15 @@ typedef NS_ENUM(NSInteger, VideoEffectType){
                     
                     if ([videoTrack statusOfValueForKey:@"preferredTransform" error:nil] == AVKeyValueStatusLoaded) {
                         CGAffineTransform preferredTransform = [videoTrack preferredTransform];
-                        self.playerView.preferSize = [videoTrack naturalSize];
+//                        self.playerView.preferSize = [videoTrack naturalSize];
+                        CGSize videoSize = videoTrack.naturalSize;
+                        CGSize presentationSize = _playerItem.presentationSize;
+                        NSLog(@"video - %@--item - %@",NSStringFromCGSize(videoSize),NSStringFromCGSize(presentationSize));
+                        CGFloat scale = [UIScreen mainScreen].scale;
+                        self.playerView.preferSize = CGSizeMake(videoSize.width, videoSize.height);
                         self.playerView.preferredRotation = -1 * atan2(preferredTransform.b, preferredTransform.a);
 //                        [self.playerView setupGL]
+                        [self addDidPlayToEndTimeNotificationForPlayerItem:_playerItem];
                         
                     }}];
                 dispatch_async(dispatch_get_main_queue(), ^{
@@ -132,12 +146,29 @@ typedef NS_ENUM(NSInteger, VideoEffectType){
     
 }
 
+- (void)addDidPlayToEndTimeNotificationForPlayerItem:(AVPlayerItem *)item
+{
+    if (_notificationToken)
+        _notificationToken = nil;
+    
+    /*
+     Setting actionAtItemEnd to None prevents the movie from getting paused at item end. A very simplistic, and not gapless, looped playback.
+     */
+    _player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
+    _notificationToken = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification object:item queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+        // Simple item playback rewind.
+        
+        [[_player currentItem] seekToTime:kCMTimeZero];
+    }];
+}
+
 
 #pragma mark - UIImagePickerControllerDelegate
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info
 {
     [picker dismissViewControllerAnimated:YES completion:nil];
     NSURL *videoUrl = info[UIImagePickerControllerReferenceURL];
+//    [self.playerView setupGL];
     [self prepareVideoWithUrl:videoUrl];
 }
 
