@@ -146,7 +146,7 @@ static const GLfloat kColorConversion709[] = {
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
     glActiveTexture(GL_TEXTURE1);
-    error = CVOpenGLESTextureCacheCreateTextureFromImage(kCFAllocatorDefault, _videoTextureCache, pixelBuffer, NULL, GL_TEXTURE_2D, GL_RG_EXT, frameWidth / 2, frameHeight / 2, GL_RG_EXT, GL_UNSIGNED_BYTE, 0, &_chromaTexture);
+    error = CVOpenGLESTextureCacheCreateTextureFromImage(kCFAllocatorDefault, _videoTextureCache, pixelBuffer, NULL, GL_TEXTURE_2D, GL_RG_EXT, frameWidth / 2, frameHeight / 2, GL_RG_EXT, GL_UNSIGNED_BYTE, 1, &_chromaTexture);
     if (error) {
         NSLog(@"texture failure");
     }
@@ -160,8 +160,8 @@ static const GLfloat kColorConversion709[] = {
     glViewport(0, 0, _backingWidth, _backingHeight);
     CFRelease(pixelBuffer);
     
+    glClearColor(0.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     
     glUseProgram(self.program);
     glUniform1i(uniforms[UNIFORM_Y], 0);
@@ -183,7 +183,8 @@ static const GLfloat kColorConversion709[] = {
         nominateSize.height = 1.0;
         nominateSize.width = cropScale.width / cropScale.height;
     }
-    NSLog(@"width - %f----height - %f",nominateSize.width,nominateSize.height);
+    NSLog(@"nominnatWidth - %f---height-%f",nominateSize.width,nominateSize.height);
+//    nominateSize = CGSizeMake(nominateSize.height, nominateSize.width);
     GLfloat vertexData[] = {-1 * nominateSize.width, -1 * nominateSize.height,
         nominateSize.width, -1 * nominateSize.height,
         -1 * nominateSize.width, nominateSize.height,
@@ -199,11 +200,19 @@ static const GLfloat kColorConversion709[] = {
         CGRectGetMaxX(textureSamplingRect), CGRectGetMinY(textureSamplingRect)
     };
     
+//    GLfloat quadTextureData[] =  {
+//        
+//        CGRectGetMinX(textureSamplingRect), CGRectGetMinY(textureSamplingRect),
+//        CGRectGetMaxX(textureSamplingRect), CGRectGetMinY(textureSamplingRect),
+//        CGRectGetMinX(textureSamplingRect), CGRectGetMaxY(textureSamplingRect),
+//        CGRectGetMaxX(textureSamplingRect), CGRectGetMaxY(textureSamplingRect),
+//    };
+    
     glVertexAttribPointer(ATTRIB_TEXCOORD, 2, GL_FLOAT, 0, 0, quadTextureData);
     glEnableVertexAttribArray(ATTRIB_TEXCOORD);
-    
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindRenderbuffer(GL_RENDERBUFFER, _colorBufferHandle);
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     [_context presentRenderbuffer:_colorBufferHandle];
     
 }
